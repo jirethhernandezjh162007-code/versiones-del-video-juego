@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Arena Vector - Combate 1 vs 1</title>
+
+<style>
+body {
+  margin: 0;
+  background: #111;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
+
+canvas {
+  display: block;
+  margin: auto;
+  background: #222;
+}
+
+#info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: white;
+}
+</style>
+</head>
+<body>
+
+<div id="info">
+<h3>Arena Vector</h3>
+<p>WASD para moverse | Barra espaciadora para atacar</p>
+</div>
+
+<canvas id="game" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let keys = {};
+
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+// ------------------ JUGADOR ------------------
+const player = {
+  x: 100,
+  y: 250,
+  size: 40,
+  speed: 4,
+  health: 100,
+  attacking: false
+};
+
+// ------------------ ENEMIGO ------------------
+const enemy = {
+  x: 600,
+  y: 250,
+  size: 40,
+  speed: 2,
+  health: 100,
+  state: "idle"
+};
+
+// ------------------ UTILIDAD DISTANCIA ------------------
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// ------------------ UPDATE JUGADOR ------------------
+function updatePlayer() {
+  if (keys["w"]) player.y -= player.speed;
+  if (keys["s"]) player.y += player.speed;
+  if (keys["a"]) player.x -= player.speed;
+  if (keys["d"]) player.x += player.speed;
+
+  player.attacking = keys[" "];
+}
+
+// ------------------ IA ENEMIGO ------------------
+function updateEnemy() {
+  let dist = distance(player, enemy);
+
+  if (dist > 200) {
+    enemy.state = "idle";
+  } else if (dist > 50) {
+    enemy.state = "chase";
+  } else {
+    enemy.state = "attack";
+  }
+
+  if (enemy.state === "chase") {
+    let dx = player.x - enemy.x;
+    let dy = player.y - enemy.y;
+    let len = Math.hypot(dx, dy);
+
+    if (len !== 0) {
+      enemy.x += (dx / len) * enemy.speed;
+      enemy.y += (dy / len) * enemy.speed;
+    }
+  }
+
+  if (enemy.state === "attack" && dist < 50) {
+    player.health -= 0.5;
+  }
+}
+
+// ------------------ COMBATE ------------------
+function checkCombat() {
+  if (player.attacking && distance(player, enemy) < 60) {
+    enemy.health -= 1;
+  }
+}
+
+// ------------------ DIBUJO ------------------
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Jugador
+  ctx.fillStyle = player.attacking ? "yellow" : "lime";
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+
+  // Enemigo
+  ctx.fillStyle = enemy.state === "attack" ? "orange" : "red";
+  ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+
+  // Vida jugador
+  ctx.fillStyle = "green";
+  ctx.fillRect(20, 20, player.health * 2, 15);
+
+  // Vida enemigo
+  ctx.fillStyle = "red";
+  ctx.fillRect(560, 20, enemy.health * 2, 15);
+
+  // Texto estado IA
+  ctx.fillStyle = "white";
+  ctx.fillText("Estado enemigo: " + enemy.state, 320, 20);
+
+  // Fin del juego
+  if (player.health <= 0) {
+    ctx.fillStyle = "white";
+    ctx.font = "40px Arial";
+    ctx.fillText("¡Has Perdido!", 280, 250);
+  }
+
+  if (enemy.health <= 0) {
+    ctx.fillStyle = "white";
+    ctx.font = "40px Arial";
+    ctx.fillText("¡Has Ganado!", 280, 250);
+  }
+}
+
+// ------------------ LOOP PRINCIPAL ------------------
+function loop() {
+  if (player.health > 0 && enemy.health > 0) {
+    updatePlayer();
+    updateEnemy();
+    checkCombat();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>

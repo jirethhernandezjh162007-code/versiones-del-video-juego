@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Arena Vector</title>
+
+<style>
+body{
+  margin:0;
+  background:#111;
+  overflow:hidden;
+  font-family:Arial;
+  color:white;
+}
+
+canvas{
+  display:block;
+  margin:auto;
+  background:#222;
+}
+
+#startScreen{
+  position:absolute;
+  width:100%;
+  height:100%;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  background:#000;
+}
+
+button{
+  padding:15px 40px;
+  font-size:20px;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<div id="startScreen">
+  <h1>Arena Vector</h1>
+  <button onclick="startGame()">Iniciar</button>
+  <p>Presiona ENTER para comenzar</p>
+</div>
+
+<canvas id="game" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const startScreen = document.getElementById("startScreen");
+
+let gameStarted = false;
+
+let keys = {};
+document.addEventListener("keydown", e=>{
+  keys[e.key.toLowerCase()] = true;
+  if(e.key === "Enter" && !gameStarted){
+    startGame();
+  }
+});
+document.addEventListener("keyup", e=>{
+  keys[e.key.toLowerCase()] = false;
+});
+
+function startGame(){
+  startScreen.style.display = "none";
+  gameStarted = true;
+}
+
+// ---------------- JUGADOR ----------------
+let player = {
+  x:100,
+  y:250,
+  size:40,
+  speed:4,
+  health:100,
+  strongAttacks:1,
+  superAttacks:1
+};
+
+// ---------------- ENEMIGO (Nivel 1) ----------------
+let enemy = {
+  x:600,
+  y:250,
+  size:40,
+  speed:1.8,
+  damage:0.4
+};
+
+// ---------------- ESTRELLITAS ----------------
+let star = null;
+
+function spawnStar(){
+  const types = ["strong","super"];
+  const type = types[Math.floor(Math.random()*2)];
+  star = {
+    x: Math.random()*750,
+    y: Math.random()*450,
+    size:20,
+    type:type,
+    timer:300 // 5 segundos aprox (60fps)
+  };
+}
+
+setInterval(()=>{
+  if(!star && gameStarted){
+    spawnStar();
+  }
+},4000);
+
+function distance(a,b){
+  return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
+function updatePlayer(){
+  if(keys["w"]) player.y -= player.speed;
+  if(keys["s"]) player.y += player.speed;
+  if(keys["a"]) player.x -= player.speed;
+  if(keys["d"]) player.x += player.speed;
+
+  // Golpe normal
+  if(keys[" "] && distance(player,enemy)<60){
+    enemy.health -= 0.5;
+  }
+
+  // Golpe fuerte (N)
+  if(keys["n"] && player.strongAttacks>0 && distance(player,enemy)<70){
+    enemy.health -= 5;
+    player.strongAttacks--;
+  }
+
+  // Super golpe (M)
+  if(keys["m"] && player.superAttacks>0 && distance(player,enemy)<90){
+    enemy.health -= 12;
+    player.superAttacks--;
+  }
+}
+
+function updateEnemy(){
+  let dx = player.x - enemy.x;
+  let dy = player.y - enemy.y;
+  let len = Math.hypot(dx,dy);
+
+  enemy.x += (dx/len)*enemy.speed;
+  enemy.y += (dy/len)*enemy.speed;
+
+  if(distance(player,enemy)<45){
+    player.health -= enemy.damage;
+  }
+}
+
+function updateStar(){
+  if(star){
+    star.timer--;
+
+    if(distance(player,star)<30){
+      if(star.type==="strong") player.strongAttacks++;
+      if(star.type==="super") player.superAttacks++;
+      star = null;
+    }
+
+    if(star && star.timer<=0){
+      star = null;
+    }
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(!gameStarted) return;
+
+  // Jugador
+  ctx.fillStyle="lime";
+  ctx.fillRect(player.x,player.y,player.size,player.size);
+
+  // Enemigo
+  ctx.fillStyle="red";
+  ctx.fillRect(enemy.x,enemy.y,enemy.size,enemy.size);
+
+  // Estrella
+  if(star){
+    ctx.fillStyle = star.type==="strong" ? "cyan" : "yellow";
+    ctx.beginPath();
+    ctx.arc(star.x,star.y,star.size/2,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // Vida
+  ctx.fillStyle="green";
+  ctx.fillRect(20,20,player.health*2,15);
+
+  ctx.fillStyle="white";
+  ctx.fillText("Golpes fuertes (N): "+player.strongAttacks,20,60);
+  ctx.fillText("Super golpes (M): "+player.superAttacks,20,80);
+
+  if(player.health<=0){
+    ctx.font="40px Arial";
+    ctx.fillText("¡Perdiste!",300,250);
+  }
+}
+
+function loop(){
+  if(gameStarted && player.health>0){
+    updatePlayer();
+    updateEnemy();
+    updateStar();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>

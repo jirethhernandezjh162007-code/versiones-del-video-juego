@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Arena Vector Final</title>
+
+<style>
+body{
+margin:0;
+background:black;
+font-family:sans-serif;
+color:white;
+overflow:hidden;
+}
+
+canvas{
+display:block;
+margin:auto;
+background:black;
+}
+
+#startScreen{
+position:absolute;
+width:100%;
+height:100%;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+background:black;
+}
+
+button{
+padding:10px 20px;
+margin:5px;
+cursor:pointer;
+}
+</style>
+
+</head>
+<body>
+
+<div id="startScreen">
+<h1>Arena Vector</h1>
+
+<p>Selecciona tu nave:</p>
+
+<button onclick="selectSkin('triangle')">▲ Triángulo</button>
+<button onclick="selectSkin('circle')">⚪ Esfera</button>
+<button onclick="selectSkin('ship')">🚀 Nave</button>
+
+<p>Presiona ENTER para iniciar</p>
+</div>
+
+<canvas id="game" width="900" height="550"></canvas>
+
+<audio id="laserSound" src="laser.mp3"></audio>
+<audio id="music" src="music.mp3" loop></audio>
+
+<script>
+
+const canvas = document.getElementById("game")
+const ctx = canvas.getContext("2d")
+
+let gameStarted=false
+let paused=false
+let level=1
+let selectedSkin="triangle"
+
+let keys={}
+
+document.addEventListener("keydown",e=>{
+
+keys[e.key]=true
+
+if(e.key==="Enter" && !gameStarted){
+startGame()
+}
+else if(e.key==="Enter" && gameStarted){
+paused=!paused
+}
+
+})
+
+document.addEventListener("keyup",e=>keys[e.key]=false)
+
+function selectSkin(s){
+selectedSkin=s
+}
+
+function startGame(){
+gameStarted=true
+document.getElementById("startScreen").style.display="none"
+document.getElementById("music").play()
+spawnEnemies()
+}
+
+function distance(a,b){
+return Math.hypot(a.x-b.x,a.y-b.y)
+}
+
+/* PLAYER */
+
+let player={
+x:100,y:250,
+health:100,
+strong:1,
+super:1,
+damageFlash:0,
+hitFlash:0
+}
+
+/* ARRAYS */
+
+let enemies=[]
+let lasers=[]
+let traps=[]
+let item=null
+let boss=null
+
+/* SPAWN */
+
+function spawnEnemies(){
+
+enemies=[]
+traps=[]
+
+let count=Math.min(level,3)
+
+for(let i=0;i<count;i++){
+enemies.push({
+x:600+Math.random()*200,
+y:Math.random()*500,
+health:100
+})
+}
+
+if(level>=4){
+for(let i=0;i<3;i++){
+traps.push({
+x:Math.random()*850,
+y:Math.random()*500
+})
+}
+}
+
+if(level===5){
+spawnBoss()
+}
+
+}
+
+function spawnBoss(){
+boss={
+x:700,y:250,
+health:600
+}
+}
+
+/* INPUT */
+
+function updatePlayer(){
+
+if(keys["ArrowUp"])player.y-=4
+if(keys["ArrowDown"])player.y+=4
+if(keys["ArrowLeft"])player.x-=4
+if(keys["ArrowRight"])player.x+=4
+
+if(keys["f"]){
+shootLaser()
+keys["f"]=false
+}
+
+if(keys[" "]){
+enemies.forEach(e=>{
+if(distance(player,e)<60){
+e.health-=0.5
+player.hitFlash=8
+}
+})
+}
+
+if(keys["n"] && player.strong>0){
+player.strong--
+enemies.forEach(e=>{
+if(distance(player,e)<70){
+e.health-=12
+}
+})
+keys["n"]=false
+}
+
+if(keys["m"] && player.super>0){
+player.super--
+enemies.forEach(e=>{
+if(distance(player,e)<80){
+e.health-=25
+}
+})
+keys["m"]=false
+}
+
+}
+
+function shootLaser(){
+
+document.getElementById("laserSound").currentTime=0
+document.getElementById("laserSound").play()
+
+lasers.push({
+x:player.x,
+y:player.y,
+speed:8
+})
+
+}
+
+/* UPDATE */
+
+function update(){
+
+if(paused || !gameStarted)return
+
+updatePlayer()
+
+lasers.forEach(l=>l.x+=l.speed)
+
+lasers.forEach(l=>{
+enemies.forEach(e=>{
+if(distance(l,e)<30){
+e.health-=3
+}
+})
+if(boss && distance(l,boss)<80){
+boss.health-=5
+}
+})
+
+enemies.forEach(e=>{
+e.x+=(player.x-e.x)*0.02
+e.y+=(player.y-e.y)*0.02
+
+if(distance(player,e)<40){
+player.health-=0.2
+player.damageFlash=10
+}
+})
+
+traps.forEach(t=>{
+if(distance(player,t)<20){
+player.health-=0.3
+}
+})
+
+if(boss){
+boss.x+=(player.x-boss.x)*0.01
+boss.y+=(player.y-boss.y)*0.01
+
+if(distance(player,boss)<80){
+player.health-=0.4
+}
+
+if(boss.health<=0){
+alert("¡Ganaste!")
+location.reload()
+}
+}
+
+enemies=enemies.filter(e=>e.health>0)
+
+if(enemies.length===0 && !boss){
+level++
+player.health=100
+spawnEnemies()
+}
+
+if(player.health<=0){
+alert("Perdiste")
+location.reload()
+}
+
+}
+
+/* DRAW */
+
+function drawPlayer(){
+
+if(player.damageFlash>0){
+ctx.shadowColor="red"
+ctx.shadowBlur=20
+player.damageFlash--
+}
+
+if(player.hitFlash>0){
+ctx.shadowColor="lime"
+ctx.shadowBlur=20
+player.hitFlash--
+}
+
+if(selectedSkin==="triangle"){
+ctx.fillStyle="cyan"
+ctx.beginPath()
+ctx.moveTo(player.x,player.y-20)
+ctx.lineTo(player.x-15,player.y+15)
+ctx.lineTo(player.x+15,player.y+15)
+ctx.closePath()
+ctx.fill()
+}
+
+if(selectedSkin==="circle"){
+ctx.fillStyle="cyan"
+ctx.beginPath()
+ctx.arc(player.x,player.y,15,0,Math.PI*2)
+ctx.fill()
+}
+
+if(selectedSkin==="ship"){
+ctx.fillStyle="white"
+ctx.fillRect(player.x-10,player.y-15,20,30)
+}
+
+ctx.shadowBlur=0
+
+}
+
+function drawEnemies(){
+
+ctx.fillStyle="red"
+
+enemies.forEach(e=>{
+ctx.beginPath()
+ctx.arc(e.x,e.y,20,0,Math.PI*2)
+ctx.fill()
+})
+
+}
+
+function drawBoss(){
+
+if(!boss)return
+
+ctx.fillStyle="purple"
+ctx.beginPath()
+ctx.arc(boss.x,boss.y,80,0,Math.PI*2)
+ctx.fill()
+
+}
+
+function drawLasers(){
+
+ctx.strokeStyle="cyan"
+
+lasers.forEach(l=>{
+ctx.beginPath()
+ctx.moveTo(l.x,l.y)
+ctx.lineTo(l.x-15,l.y)
+ctx.stroke()
+})
+
+}
+
+function drawTraps(){
+
+ctx.fillStyle="orange"
+
+traps.forEach(t=>{
+ctx.beginPath()
+ctx.arc(t.x,t.y,10,0,Math.PI*2)
+ctx.fill()
+})
+
+}
+
+function drawUI(){
+
+ctx.fillStyle="white"
+ctx.font="14px sans-serif"
+
+ctx.fillText("Nivel "+level,420,20)
+
+ctx.fillStyle="green"
+ctx.fillRect(20,30,player.health*2,10)
+
+/* ITEMS */
+
+let x=20,y=60
+
+for(let i=0;i<player.super;i++){
+ctx.fillText("⭐",x,y)
+x+=20
+}
+
+ctx.fillText("(M)",x+5,y)
+
+x=20;y=90
+
+for(let i=0;i<player.strong;i++){
+ctx.fillText("💎",x,y)
+x+=20
+}
+
+ctx.fillText("(N)",x+5,y)
+
+}
+
+/* LOOP */
+
+function loop(){
+
+ctx.clearRect(0,0,900,550)
+
+update()
+
+drawPlayer()
+drawEnemies()
+drawBoss()
+drawLasers()
+drawTraps()
+drawUI()
+
+if(paused){
+ctx.fillStyle="white"
+ctx.font="28px sans-serif"
+ctx.fillText("¿Seguir jugando?",300,250)
+}
+
+requestAnimationFrame(loop)
+
+}
+
+loop()
+
+</script>
+
+</body>
+</html>
